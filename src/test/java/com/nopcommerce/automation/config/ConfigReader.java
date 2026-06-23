@@ -22,15 +22,33 @@ public final class ConfigReader {
     private static void loadProperties() {
         String environment = System.getProperty("environment", "local");
         String configFile = "config/" + environment + ".properties";
+        String fallbackConfigFile = configFile + ".example";
 
-        try (InputStream inputStream = ConfigReader.class.getClassLoader().getResourceAsStream(configFile)) {
-            if (inputStream == null) {
-                throw new IllegalStateException("Configuration file not found: " + configFile);
+        InputStream inputStream = ConfigReader.class.getClassLoader().getResourceAsStream(configFile);
+        String loadedFrom = configFile;
+
+        if (inputStream == null) {
+            inputStream = ConfigReader.class.getClassLoader().getResourceAsStream(fallbackConfigFile);
+            loadedFrom = fallbackConfigFile;
+        }
+
+        if (inputStream == null) {
+            throw new IllegalStateException(
+                    "Configuration file not found: " + configFile
+                            + ". Copy " + fallbackConfigFile + " to " + configFile + " and set your values.");
+        }
+
+        try (InputStream stream = inputStream) {
+            properties.load(stream);
+            if (loadedFrom.endsWith(".example")) {
+                logger.warn(
+                        "Loaded configuration from {}. Copy {} to {} for local overrides.",
+                        loadedFrom, fallbackConfigFile, configFile);
+            } else {
+                logger.info("Loaded configuration from {}", loadedFrom);
             }
-            properties.load(inputStream);
-            logger.info("Loaded configuration from {}", configFile);
         } catch (IOException exception) {
-            throw new IllegalStateException("Unable to load configuration file: " + configFile, exception);
+            throw new IllegalStateException("Unable to load configuration file: " + loadedFrom, exception);
         }
     }
 
